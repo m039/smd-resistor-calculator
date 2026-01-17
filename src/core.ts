@@ -10,6 +10,8 @@ export function calculateResistorValue(value: string): Result | null {
     return null;
   }
 
+  value = value.trim().toLowerCase();
+
   let result: Result = { resistance: 0, tolerance: 0 };
 
   if (value.length == 3) {
