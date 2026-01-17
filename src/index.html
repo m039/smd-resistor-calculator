@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Калькулятор SMD резисторов</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v6.5.0/css/all.css">
+  <style>
+    .hero {
+      background-color: #f5f5f5;
+    }
+
+    .resistor-input-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      max-width: 240px;
+      margin: 0 auto;
+    }
+
+    .resistor-lead {
+      flex: 0 0 20px;
+      height: 96px;
+      background-color: #ccc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .resistor-body {
+      flex: 1;
+      height: 94px;
+      background-color: #000;
+      color: #fff;
+      font-size: 3rem;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 1px;
+    }
+
+    .resistor-input {
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      color: #fff;
+      border: none;
+      font-size: 3rem;
+      text-align: center;
+      outline: none;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 1px;
+    }
+
+    .resistor-input::placeholder {
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    /* Остальные стили */
+    .result-box {
+      margin-top: 2rem;
+    }
+
+    .help-box {
+      margin-top: 1.5rem;
+    }
+
+    .klever-toasts-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 10px;
+    }
+
+    /* Анимация появления/скрытия */
+    .klever-toast {
+      opacity: 0;
+      transform: translateX(100%);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+
+    .klever-toast.is-showing {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="klever-toasts" class="klever-toasts-container">
+  </div>
+
+  <section class="hero is-primary is-bold">
+    <div class="hero-body">
+      <div class="container">
+        <h1 class="title">Калькулятор SMD резисторов</h1>
+        <p class="subtitle">Определите сопротивление по маркировке</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="columns is-centered">
+        <div class="column is-8-tablet is-6-desktop">
+          <!-- Форма ввода с резистивным стилем -->
+          <form id="smd-calculator" class="has-text-centered">
+            <div class="field">
+              <label class="label">Введите маркировку резистора</label>
+              <div class="control resistor-input-container ">
+                <div class="resistor-lead"></div>
+                <div class="resistor-body">
+                  <input class="resistor-input" type="text" id="resistorCode" placeholder="XXXX" maxlength="4"
+                    autocomplete="off" oninput="this.value = this.value.toUpperCase()">
+                </div>
+                <div class="resistor-lead"></div>
+              </div>
+            </div>
+          </form>
+
+          <!-- Результат -->
+          <div id="result" class="box result-box is-hidden">
+            <div class="content">
+              <p><strong>Сопротивление:</strong> <span id="resistanceValue"></span> Ом</p>
+              <p><strong>Точность:</strong> <span id="toleranceValue"></span></p>
+            </div>
+          </div>
+
+          <!-- Справка -->
+          <div class="box help-box">
+            <h4 class="title is-6">Справка</h4>
+            <div class="content">
+              <ul>
+                <li><strong>2 цифры и 1 буква:</strong> рассчитывается по EIA-96 коду.</li>
+                <li><strong>3 цифры:</strong> первые две — мантисса, третья — степень 10 (например, <code>102</code> =
+                  10 * 10^2 = 1000 Ом)</li>
+                <li><strong>4 цифры:</strong> первые три — мантисса, четвёртая — степень 10 (например, <code>4701</code>
+                  = 470 * 10^1 = 470 Ом)</li>
+                <li><strong>R-нотация:</strong> <code>R</code> означает десятичную точку (например, <code>R100</code> =
+                  0.100 Ом). Если есть <code>R</code>, то степень 10 не используется.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script type="module">
+    document.addEventListener('DOMContentLoaded', function () {
+      // Получаем элементы
+      const input = document.getElementById('resistorCode');
+      const resultBox = document.getElementById('result');
+      const resistanceValueSpan = document.getElementById('resistanceValue');
+      const toleranceValueSpan = document.getElementById('toleranceValue');
+
+      // Функция обновления результата
+      function updateResult() {
+        const value = input.value.trim().toLowerCase();
+        let showResult = false;
+
+        if (value.length == 3) {
+          toleranceValueSpan.textContent = '±5%';
+        } else if (value.length == 4) {
+          toleranceValueSpan.textContent = '±1%';
+        }
+
+        if (/^\d{3}$/.test(value)) {
+          const mantissa = parseInt(value.substr(0, 2), 10);
+          const exponent = parseInt(value.substr(2, 1), 10);
+          const resistance = mantissa * Math.pow(10, exponent);
+          resistanceValueSpan.textContent = resistance;
+          showResult = true;
+        } else if (/^\d{4}$/.test(value)) {
+          const mantissa = parseInt(value.substr(0, 3), 10);
+          const exponent = parseInt(value.substr(3, 1), 10);
+          const resistance = mantissa * Math.pow(10, exponent);
+          resistanceValueSpan.textContent = resistance;
+          showResult = true;
+        } else if (/^\d*r\d*$/.test(value) &&
+          (value.length == 3 || value.length == 4) &&
+          value.split('r').length === 2 &&
+          value.indexOf('r') != value.length - 1) {
+          resistanceValueSpan.textContent = parseFloat(value.replace('r', '.'));
+          showResult = true;
+        } else if (value.length == 3) {
+          const codeMap = {};
+          codeMap["01"] = 100;
+          codeMap["02"] = 102;
+          codeMap["03"] = 105;
+          codeMap["04"] = 107;
+          codeMap["05"] = 110;
+          codeMap["06"] = 113;
+          codeMap["07"] = 115;
+          codeMap["08"] = 118;
+          codeMap["09"] = 121;
+          codeMap["10"] = 124;
+          codeMap["11"] = 127;
+          codeMap["12"] = 130;
+          codeMap["13"] = 133;
+          codeMap["14"] = 137;
+          codeMap["15"] = 140;
+          codeMap["16"] = 143;
+          codeMap["17"] = 147;
+          codeMap["18"] = 150;
+          codeMap["19"] = 154;
+          codeMap["20"] = 158;
+          codeMap["21"] = 162;
+          codeMap["22"] = 165;
+          codeMap["23"] = 169;
+          codeMap["24"] = 174;
+          codeMap["25"] = 178;
+          codeMap["26"] = 182;
+          codeMap["27"] = 187;
+          codeMap["28"] = 191;
+          codeMap["29"] = 196;
+          codeMap["30"] = 200;
+          codeMap["31"] = 205;
+          codeMap["32"] = 210;
+          codeMap["33"] = 215;
+          codeMap["34"] = 221;
+          codeMap["35"] = 226;
+          codeMap["36"] = 232;
+          codeMap["37"] = 237;
+          codeMap["38"] = 243;
+          codeMap["39"] = 249;
+          codeMap["40"] = 255;
+          codeMap["41"] = 261;
+          codeMap["42"] = 267;
+          codeMap["43"] = 274;
+          codeMap["44"] = 280;
+          codeMap["45"] = 287;
+          codeMap["46"] = 294;
+          codeMap["47"] = 301;
+          codeMap["48"] = 309;
+          codeMap["49"] = 316;
+          codeMap["50"] = 324;
+          codeMap["51"] = 332;
+          codeMap["52"] = 340;
+          codeMap["53"] = 348;
+          codeMap["54"] = 357;
+          codeMap["55"] = 365;
+          codeMap["56"] = 374;
+          codeMap["57"] = 383;
+          codeMap["58"] = 392;
+          codeMap["59"] = 402;
+          codeMap["60"] = 412;
+          codeMap["61"] = 422;
+          codeMap["62"] = 432;
+          codeMap["63"] = 442;
+          codeMap["64"] = 453;
+          codeMap["65"] = 464;
+          codeMap["66"] = 475;
+          codeMap["67"] = 487;
+          codeMap["68"] = 499;
+          codeMap["69"] = 511;
+          codeMap["70"] = 523;
+          codeMap["71"] = 536;
+          codeMap["72"] = 549;
+          codeMap["73"] = 562;
+          codeMap["74"] = 576;
+          codeMap["75"] = 590;
+          codeMap["76"] = 604;
+          codeMap["77"] = 619;
+          codeMap["78"] = 634;
+          codeMap["79"] = 649;
+          codeMap["80"] = 665;
+          codeMap["81"] = 681;
+          codeMap["82"] = 698;
+          codeMap["83"] = 715;
+          codeMap["84"] = 732;
+          codeMap["85"] = 750;
+          codeMap["86"] = 768;
+          codeMap["87"] = 787;
+          codeMap["88"] = 806;
+          codeMap["89"] = 825;
+          codeMap["90"] = 845;
+          codeMap["91"] = 866;
+          codeMap["92"] = 887;
+          codeMap["93"] = 909;
+          codeMap["94"] = 931;
+          codeMap["95"] = 953;
+          codeMap["96"] = 976;
+
+          const factorMap = {};
+          factorMap["z"] = 0.001;
+          factorMap["y"] = 0.01;
+          factorMap["r"] = 0.01;
+          factorMap["x"] = 0.1;
+          factorMap["s"] = 0.1;
+          factorMap["a"] = 1;
+          factorMap["b"] = 10;
+          factorMap["h"] = 10;
+          factorMap["c"] = 100;
+          factorMap["d"] = 1000;
+          factorMap["e"] = 10000;
+          factorMap["f"] = 100000;
+
+          const code = value.substr(0, 2);
+          const factor = value.substr(2, 1);
+
+          if (codeMap[code] != undefined && factorMap[factor] != undefined) {
+            resistanceValueSpan.textContent = codeMap[code] * factorMap[factor];
+            showResult = true;
+            toleranceValueSpan.textContent = '±1%';
+          }
+        }
+
+        if (!showResult) {
+          resultBox.classList.add('is-hidden');
+        } else {
+          resultBox.classList.remove('is-hidden');
+        }
+      }
+
+      input.addEventListener('input', updateResult);
+
+      updateResult();
+    });
+  </script>
+</body>
+
+</html>
